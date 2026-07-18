@@ -79,6 +79,29 @@ a workplace-chat layout with a channel sidebar, demo identity selector, message
 timeline, security verification cards, AI context details, and response buttons.
 Use the refresh button to retrieve messages posted by another browser or service.
 
+### One-command demo
+
+After `make install` and optional OpenAI configuration, run the complete local
+demo with:
+
+```bash
+make demo
+```
+
+The demo runner starts or reuses the backend, posts a relevant VPN/travel message
+and a random selection of background chat, submits a network alert, starts or
+reuses Streamlit, opens the UI in your default browser, and prints the event
+details. It intentionally leaves
+the human verification unanswered. Open `http://localhost:8501`, respond as
+Sicily, and press Ctrl+C in the demo terminal when finished. Existing history is
+preserved, and the runner stops only services that it started.
+
+For a repeatable message selection or a different message count:
+
+```bash
+.venv/bin/python scripts/demo.py --seed 42 --messages 8
+```
+
 ## Try the flow
 
 Post an ordinary context message:

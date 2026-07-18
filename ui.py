@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 load_dotenv()
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8003").rstrip("/")
 REQUEST_TIMEOUT = 5.0
-DEMO_MEMBERS = ("Sicily", "Eitan", "Hayden", "Reuben")
+DEMO_MEMBERS = ("Sicily", "Eitan", "Haden", "Reuben")
 DECISIONS = ("Yes", "No", "Unsure")
 
 

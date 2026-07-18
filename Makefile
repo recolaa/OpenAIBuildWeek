@@ -1,4 +1,4 @@
-.PHONY: install backend ui test
+.PHONY: install backend ui demo test
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -14,6 +14,9 @@ backend:
 
 ui:
 	$(PYTHON) -m streamlit run ui.py
+
+demo:
+	$(PYTHON) scripts/demo.py
 
 test:
 	$(PYTHON) -m pytest -vv -ra --durations=10
