@@ -13,10 +13,12 @@ After a human responds, the backend sends a summarized, idempotent callback to
 the configured coordinator. Callback failure never removes or rolls back the
 human response, and failed deliveries can be retried manually.
 
-Each completed analysis contains `observed_facts`, `relevant_message_ids`,
-`inference`, `unresolved_issue`, `verification_target`, `verification_question`,
-and `context_confidence`. The target and question are deterministically replaced
-with values derived from the alert before storage.
+Each analysis contains grounded `observed_facts` with message IDs, authors,
+facts, and relevance; plus `relevant_message_ids`, `inference`,
+`unresolved_issue`, `verification_target`, `verification_question`,
+`context_confidence`, `context_status`, and a sanitized optional `ai_error`.
+The target and question are deterministically derived from the alert before
+storage.
 
 ## Security boundary
 
@@ -42,7 +44,8 @@ cp .env.example .env
 
 Set `OPENAI_API_KEY` and `OPENAI_MODEL` in `.env`. Keep `.env` local; it is
 ignored by Git. Without a usable AI configuration, alerts are still persisted
-and verified, with `analysis_status: "failed"` and an understandable error.
+and verified, with `analysis_status: "failed"`, a valid assessment whose
+`context_status` is `"ai_unavailable"`, and a sanitized error category.
 
 Set `COORDINATOR_RESPONSE_URL` to the coordinator endpoint that receives human
 responses. If it is missing or unavailable, the response remains stored and the

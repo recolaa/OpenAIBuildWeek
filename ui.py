@@ -200,7 +200,10 @@ def render_analysis(event: dict[str, Any]) -> None:
             st.markdown("**Observed facts**")
             if facts:
                 for fact in facts:
-                    st.markdown(f"- {fact}")
+                    fact_text = (
+                        fact.get("fact") if isinstance(fact, dict) else fact
+                    )
+                    st.markdown(f"- {fact_text}")
             else:
                 st.caption("No relevant chat facts were observed.")
             st.markdown("**Inference**")

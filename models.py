@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Annotated, Optional
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 
 NonEmptyText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -42,27 +42,77 @@ class Message(BaseModel):
     security_event_id: Optional[UUID] = None
 
 
-def build_verification_question(actor: str, request_summary: str) -> str:
+def build_verification_question(
+    actor: str,
+    request_summary: str,
+    detected_at: Optional[datetime] = None,
+) -> str:
     """Build the mandatory question from alert data, never from chat context."""
 
-    return (
+    question = (
         f'{actor}, did you initiate this specific privileged action: '
-        f'"{request_summary}"?'
+        f'"{request_summary}"'
     )
+    if detected_at is not None:
+        timestamp = detected_at.astimezone(timezone.utc).strftime(
+            "%Y-%m-%d at %H:%M UTC"
+        )
+        question += f" at approximately {timestamp}"
+    return f"{question}?"
 
 
-class AIContextResult(BaseModel):
-    """Structured contract for the later OpenAI context-analysis stage."""
+class ObservedFact(BaseModel):
+    """One chat-grounded fact cited by the context assessment."""
 
     model_config = ConfigDict(extra="forbid")
 
-    observed_facts: list[NonEmptyText]
-    relevant_message_ids: list[UUID]
+    message_id: UUID
+    author: NonEmptyText = Field(max_length=80)
+    fact: NonEmptyText = Field(max_length=1_000)
+    relevance: NonEmptyText = Field(max_length=1_000)
+
+
+class AIAnalysisStatus(str, Enum):
+    RELEVANT_CONTEXT_FOUND = "relevant_context_found"
+    NO_RELEVANT_CONTEXT = "no_relevant_context"
+    AI_UNAVAILABLE = "ai_unavailable"
+
+
+class AIErrorCategory(str, Enum):
+    CONFIGURATION = "configuration"
+    TIMEOUT = "timeout"
+    REFUSAL = "refusal"
+    INVALID_OUTPUT = "invalid_output"
+    API_ERROR = "api_error"
+
+
+class ChatContextAssessment(BaseModel):
+    """Grounded, application-canonicalized chat context assessment."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    observed_facts: list[ObservedFact]
     inference: NonEmptyText
     unresolved_issue: NonEmptyText
     verification_target: NonEmptyText
     verification_question: NonEmptyText
     context_confidence: float = Field(ge=0.0, le=1.0)
+    context_status: AIAnalysisStatus
+    ai_error: Optional[AIErrorCategory] = None
+    # Compatibility projection for the existing API/coordinator contract. It
+    # is always recalculated from grounded facts and cannot add new evidence.
+    relevant_message_ids: list[UUID] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def derive_relevant_message_ids(self) -> "ChatContextAssessment":
+        self.relevant_message_ids = list(
+            dict.fromkeys(fact.message_id for fact in self.observed_facts)
+        )
+        return self
+
+
+# Backward-compatible name used by existing store and coordinator code.
+AIContextResult = ChatContextAssessment
 
 
 class NetworkAlertCreate(BaseModel):
@@ -75,6 +125,11 @@ class NetworkAlertCreate(BaseModel):
     source_ip: Optional[NonEmptyText] = Field(default=None, max_length=64)
     network_risk_score: float = Field(default=1.0, ge=0.0, le=1.0)
     detected_at: datetime = Field(default_factory=utc_now)
+
+
+# Domain names used by the AI boundary without changing the public API models.
+NetworkAlert = NetworkAlertCreate
+ChatMessage = Message
 
 
 class AnalysisStatus(str, Enum):
@@ -154,7 +209,7 @@ class SecurityEvent(BaseModel):
     alert: NetworkAlertCreate
     created_at: datetime = Field(default_factory=utc_now)
     analysis_status: AnalysisStatus = AnalysisStatus.NOT_RUN
-    ai_context: Optional[AIContextResult] = None
+    ai_context: Optional[ChatContextAssessment] = None
     analysis_error: Optional[str] = None
     verification_message_id: UUID
     human_response: Optional[HumanResponse] = None

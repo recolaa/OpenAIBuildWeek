@@ -11,12 +11,14 @@ import pytest
 import coordinator
 from coordinator import build_callback_payload, deliver_coordinator_callback
 from models import (
-    AIContextResult,
+    AIAnalysisStatus,
     CallbackStatus,
+    ChatContextAssessment,
     CoordinatorCallbackState,
     HumanDecision,
     HumanResponse,
     NetworkAlertCreate,
+    ObservedFact,
     SecurityEvent,
 )
 
@@ -38,14 +40,21 @@ def responded_event() -> SecurityEvent:
             source_ip="203.0.113.10",
             network_risk_score=0.94,
         ),
-        ai_context=AIContextResult(
-            observed_facts=["FULL SECRET CHAT BODY MUST NOT BE SENT"],
-            relevant_message_ids=[relevant_id],
+        ai_context=ChatContextAssessment(
+            observed_facts=[
+                ObservedFact(
+                    message_id=relevant_id,
+                    author="Alice",
+                    fact="FULL SECRET CHAT BODY MUST NOT BE SENT",
+                    relevance="The message may explain the network origin.",
+                )
+            ],
             inference="The VPN may explain the unusual network origin.",
             unresolved_issue="The initiator remains unverified.",
             verification_target="Alice",
             verification_question="Did you initiate the action?",
             context_confidence=0.8,
+            context_status=AIAnalysisStatus.RELEVANT_CONTEXT_FOUND,
         ),
         verification_message_id=uuid4(),
         human_response=HumanResponse(
@@ -155,4 +164,3 @@ def test_payload_builder_requires_a_stored_response() -> None:
     event = responded_event().model_copy(update={"human_response": None})
     with pytest.raises(ValueError, match="stored human response"):
         build_callback_payload(event)
-

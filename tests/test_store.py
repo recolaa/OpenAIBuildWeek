@@ -5,12 +5,14 @@ from __future__ import annotations
 from pathlib import Path
 
 from models import (
-    AIContextResult,
+    AIAnalysisStatus,
     CallbackStatus,
+    ChatContextAssessment,
     CoordinatorDeliveryResult,
     HumanResponseCreate,
     MessageCreate,
     NetworkAlertCreate,
+    ObservedFact,
 )
 from store import SQLiteStore
 
@@ -24,14 +26,21 @@ def test_complete_history_survives_store_restart(tmp_path: Path) -> None:
             content="I am traveling and expect to connect through the VPN.",
         )
     )
-    context = AIContextResult(
-        observed_facts=["Sicily said she expects to use the VPN."],
-        relevant_message_ids=[chat_message.id],
+    context = ChatContextAssessment(
+        observed_facts=[
+            ObservedFact(
+                message_id=chat_message.id,
+                author="Sicily",
+                fact="Sicily said she expects to use the VPN.",
+                relevance="The VPN may explain the unusual source address.",
+            )
+        ],
         inference="The VPN may explain the unusual source address.",
         unresolved_issue="The initiator remains unverified.",
         verification_target="Sicily",
         verification_question="This value is canonicalized by the store.",
         context_confidence=0.82,
+        context_status=AIAnalysisStatus.RELEVANT_CONTEXT_FOUND,
     )
     event = store.create_security_event(
         NetworkAlertCreate(
@@ -71,11 +80,13 @@ def test_complete_history_survives_store_restart(tmp_path: Path) -> None:
     messages = reopened.list_messages()
     restored = reopened.get_security_event(event.id)
 
-    assert [message.content for message in messages] == [
-        "I am traveling and expect to connect through the VPN.",
+    assert messages[0].content == (
+        "I am traveling and expect to connect through the VPN."
+    )
+    assert messages[1].content.startswith(
         'Sicily, did you initiate this specific privileged action: '
-        '"rotate the production TLS certificate"?',
-    ]
+        '"rotate the production TLS certificate" at approximately '
+    )
     assert restored.ai_context.relevant_message_ids == [chat_message.id]
     assert restored.human_response.response.value == "Unsure"
     assert restored.coordinator_callback.callback_id == callback_id
@@ -89,4 +100,3 @@ def test_complete_history_survives_store_restart(tmp_path: Path) -> None:
     assert restored.coordinator_callback_attempts[0].response_status_code == 503
     assert restored.coordinator_callback_attempts[1].response_status_code == 202
     reopened.close()
-

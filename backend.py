@@ -8,7 +8,7 @@ from uuid import UUID
 from fastapi import FastAPI, HTTPException, status
 from dotenv import load_dotenv
 
-from ai_context import AIContextUnavailableError, analyze_context
+from ai_context import analyze_chat_context
 from coordinator import deliver_coordinator_callback
 
 from models import (
@@ -81,15 +81,7 @@ async def create_message(message: MessageCreate) -> Message:
 )
 async def create_network_alert(alert: NetworkAlertCreate) -> SecurityEvent:
     recent_messages = get_store().list_recent_user_messages()
-    try:
-        ai_context = await analyze_context(alert, recent_messages)
-    except AIContextUnavailableError as exc:
-        # Preserve the alert and mandatory human-verification path even when the
-        # optional context dependency fails. Context is never authorization.
-        return get_store().create_security_event(
-            alert, analysis_error=str(exc)
-        )
-
+    ai_context = await analyze_chat_context(alert, recent_messages)
     return get_store().create_security_event(alert, ai_context=ai_context)
 
 

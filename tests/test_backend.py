@@ -10,12 +10,16 @@ import httpx
 import pytest
 
 import backend
-from ai_context import AIContextUnavailableError
 from backend import app
 from models import (
-    AIContextResult,
+    AIAnalysisStatus,
+    AIErrorCategory,
     CallbackStatus,
+    ChatContextAssessment,
     CoordinatorDeliveryResult,
+    NetworkAlertCreate,
+    ObservedFact,
+    build_verification_question,
 )
 from store import SQLiteStore
 
@@ -36,8 +40,24 @@ def reset_store(
     test_store = SQLiteStore(tmp_path / "backend-test.db")
     app.state.store = test_store
 
-    async def unavailable_analysis(*args: object) -> None:
-        raise AIContextUnavailableError("Mocked OpenAI outage.")
+    async def unavailable_analysis(
+        alert: NetworkAlertCreate, *args: object
+    ) -> ChatContextAssessment:
+        return ChatContextAssessment(
+            observed_facts=[],
+            inference="Automated chat-context analysis was unavailable.",
+            unresolved_issue=(
+                "It has not been confirmed whether the account owner initiated "
+                "this action."
+            ),
+            verification_target=alert.actor,
+            verification_question=build_verification_question(
+                alert.actor, alert.request_summary, alert.detected_at
+            ),
+            context_confidence=0.0,
+            context_status=AIAnalysisStatus.AI_UNAVAILABLE,
+            ai_error=AIErrorCategory.API_ERROR,
+        )
 
     async def unavailable_coordinator(*args: object) -> CoordinatorDeliveryResult:
         return CoordinatorDeliveryResult(
@@ -47,7 +67,7 @@ def reset_store(
 
     # Every alert test is isolated from the network. Individual success tests
     # replace this default with a structured fake result.
-    monkeypatch.setattr(backend, "analyze_context", unavailable_analysis)
+    monkeypatch.setattr(backend, "analyze_chat_context", unavailable_analysis)
     monkeypatch.setattr(
         backend, "deliver_coordinator_callback", unavailable_coordinator
     )
@@ -124,8 +144,10 @@ async def test_network_alert_posts_targeted_verification_message(
 ) -> None:
     event = await create_alert(client)
     assert event["analysis_status"] == "failed"
-    assert event["ai_context"] is None
-    assert event["analysis_error"] == "Mocked OpenAI outage."
+    assert event["ai_context"]["context_status"] == "ai_unavailable"
+    assert event["ai_context"]["ai_error"] == "api_error"
+    assert event["ai_context"]["observed_facts"] == []
+    assert event["analysis_error"] == "api_error"
     assert event["human_response"] is None
 
     messages = (await client.get("/messages")).json()
@@ -145,23 +167,32 @@ async def test_network_alert_persists_structured_ai_context(
     )
     message_id = context_message.json()["id"]
 
-    async def successful_analysis(*args: object) -> AIContextResult:
-        return AIContextResult(
-            observed_facts=["Alice said she is traveling and using a VPN."],
-            relevant_message_ids=[message_id],
+    async def successful_analysis(*args: object) -> ChatContextAssessment:
+        return ChatContextAssessment(
+            observed_facts=[
+                ObservedFact(
+                    message_id=message_id,
+                    author="Alice",
+                    fact="Alice said she is traveling and using a VPN.",
+                    relevance="The VPN may explain the unusual source location.",
+                )
+            ],
             inference="The VPN may explain an unusual source location.",
             unresolved_issue="Chat context does not prove who initiated the action.",
             verification_target="Alice",
             verification_question="canonical question from analysis layer",
             context_confidence=0.72,
+            context_status=AIAnalysisStatus.RELEVANT_CONTEXT_FOUND,
         )
 
-    monkeypatch.setattr(backend, "analyze_context", successful_analysis)
+    monkeypatch.setattr(backend, "analyze_chat_context", successful_analysis)
     event = await create_alert(client)
 
     assert event["analysis_status"] == "completed"
     assert event["analysis_error"] is None
     assert event["ai_context"]["relevant_message_ids"] == [message_id]
+    assert event["ai_context"]["observed_facts"][0]["message_id"] == message_id
+    assert event["ai_context"]["context_status"] == "relevant_context_found"
     assert event["ai_context"]["context_confidence"] == 0.72
     assert "specific privileged action" in event["ai_context"][
         "verification_question"

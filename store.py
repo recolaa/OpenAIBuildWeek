@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 
 from models import (
     AIContextResult,
+    AIAnalysisStatus,
     AnalysisStatus,
     CallbackStatus,
     CoordinatorCallbackAttempt,
@@ -217,7 +218,7 @@ class SQLiteStore:
         with self._lock, self._connection:
             event_id = uuid4()
             verification_question = build_verification_question(
-                alert.actor, alert.request_summary
+                alert.actor, alert.request_summary, alert.detected_at
             )
             canonical_context = (
                 ai_context.model_copy(
@@ -230,6 +231,16 @@ class SQLiteStore:
                 if ai_context is not None
                 else None
             )
+            if canonical_context is None:
+                event_analysis_status = (
+                    AnalysisStatus.FAILED
+                    if analysis_error is not None
+                    else AnalysisStatus.NOT_RUN
+                )
+            elif canonical_context.context_status == AIAnalysisStatus.AI_UNAVAILABLE:
+                event_analysis_status = AnalysisStatus.FAILED
+            else:
+                event_analysis_status = AnalysisStatus.COMPLETED
             message = Message(
                 author="Security Bot",
                 content=verification_question,
@@ -239,15 +250,14 @@ class SQLiteStore:
             event = SecurityEvent(
                 id=event_id,
                 alert=alert,
-                analysis_status=(
-                    AnalysisStatus.COMPLETED
-                    if canonical_context is not None
-                    else AnalysisStatus.FAILED
-                    if analysis_error is not None
-                    else AnalysisStatus.NOT_RUN
-                ),
+                analysis_status=event_analysis_status,
                 ai_context=canonical_context,
-                analysis_error=analysis_error,
+                analysis_error=(
+                    canonical_context.ai_error.value
+                    if canonical_context is not None
+                    and canonical_context.ai_error is not None
+                    else analysis_error
+                ),
                 verification_message_id=message.id,
             )
             self._connection.execute(
@@ -505,4 +515,3 @@ class SQLiteStore:
                 ),
             )
             return self._event_from_row(self._get_event_row(event_id))
-
