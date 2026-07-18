@@ -109,6 +109,52 @@ def inject_styles() -> None:
         .member-line { color: #c7d0df !important; font-size: .86rem; padding: .18rem 0; }
         .member-dot { display: inline-block; height: 7px; width: 7px; border-radius: 99px;
             background: #22c55e; margin-right: .45rem; }
+        [data-testid="stMain"] .stButton button[kind="secondary"] {
+            background: #111827; border-color: #263244; color: #ffffff !important;
+        }
+        [data-testid="stMain"] .stButton button[kind="secondary"]:hover {
+            background: #202a3b; border-color: #3a4961; color: #ffffff !important;
+        }
+        [data-testid="stMain"] .stButton button[kind="primary"] {
+            background: #ff4b4b; border-color: #ff4b4b; color: #ffffff !important;
+        }
+        [data-testid="stMain"] .stButton button p,
+        [data-testid="stMain"] .stButton button span {
+            color: inherit !important;
+        }
+        [class*="st-key-response-actions-"] [data-testid="stColumn"]:nth-child(1) button {
+            background: #16a34a !important; border-color: #16a34a !important;
+            color: #ffffff !important;
+        }
+        [class*="st-key-response-actions-"] [data-testid="stColumn"]:nth-child(1) button:hover {
+            background: #15803d !important; border-color: #15803d !important;
+        }
+        [class*="st-key-response-actions-"] [data-testid="stColumn"]:nth-child(2) button {
+            background: #ff4b4b !important; border-color: #ff4b4b !important;
+            color: #ffffff !important;
+        }
+        [class*="st-key-response-actions-"] [data-testid="stColumn"]:nth-child(2) button:hover {
+            background: #dc2626 !important; border-color: #dc2626 !important;
+        }
+        [class*="st-key-response-actions-"] [data-testid="stColumn"]:nth-child(3) button {
+            background: #2563eb !important; border-color: #2563eb !important;
+            color: #ffffff !important;
+        }
+        [class*="st-key-response-actions-"] [data-testid="stColumn"]:nth-child(3) button:hover {
+            background: #1d4ed8 !important; border-color: #1d4ed8 !important;
+        }
+        [class*="st-key-retry-"] button,
+        [class*="st-key-refresh-chat"] button {
+            color: #ffffff !important;
+        }
+        [class*="st-key-retry-"] button p,
+        [class*="st-key-retry-"] button span,
+        [class*="st-key-retry-"] button div,
+        [class*="st-key-refresh-chat"] button p,
+        [class*="st-key-refresh-chat"] button span,
+        [class*="st-key-refresh-chat"] button div {
+            color: #ffffff !important;
+        }
         [data-testid="stChatInput"] { border-color: #d7dce5; box-shadow: 0 8px 28px rgba(31,41,55,.08); }
         #MainMenu, footer { visibility: hidden; }
         </style>
@@ -184,6 +230,32 @@ def render_security_message(message: dict[str, Any], identity: str) -> None:
             decision = html.escape(str(answer.get("response", "")))
             responder = html.escape(str(answer.get("responder", "")))
             st.success(f"Recorded: {responder} answered {decision}.")
+            callback = event.get("coordinator_callback") or {}
+            callback_status = callback.get("status")
+            if callback_status == "delivered":
+                status_code = callback.get("response_status_code")
+                coordinator_decision = callback.get("coordinator_decision")
+                delivery_note = f"Coordinator delivery succeeded (HTTP {status_code})."
+                if coordinator_decision:
+                    delivery_note += f" Decision: {coordinator_decision}."
+                st.caption(delivery_note)
+            elif callback_status == "failed":
+                st.warning(callback.get("last_error") or "Coordinator delivery failed.")
+                if st.button(
+                    "Retry coordinator delivery",
+                    key=f"retry-{event_id}",
+                    use_container_width=True,
+                ):
+                    try:
+                        api_request(
+                            "POST",
+                            f"/security-events/{event_id}/coordinator-callback/retry",
+                        )
+                        st.rerun()
+                    except RuntimeError as exc:
+                        st.error(str(exc))
+            elif callback_status == "pending":
+                st.info("Coordinator delivery is pending.")
             return
 
         target = str(event.get("alert", {}).get("actor", ""))
@@ -192,24 +264,25 @@ def render_security_message(message: dict[str, Any], identity: str) -> None:
             return
 
         st.caption("Your answer is recorded on this security event for the coordinator.")
-        columns = st.columns(3)
-        for column, decision in zip(columns, DECISIONS):
-            button_type = "primary" if decision == "No" else "secondary"
-            if column.button(
-                decision,
-                key=f"{event_id}-{decision}",
-                type=button_type,
-                use_container_width=True,
-            ):
-                try:
-                    api_request(
-                        "POST",
-                        f"/security-events/{event_id}/human-response",
-                        json={"responder": identity, "response": decision},
-                    )
-                    st.rerun()
-                except RuntimeError as exc:
-                    st.error(str(exc))
+        with st.container(key=f"response-actions-{event_id}"):
+            columns = st.columns(3)
+            for column, decision in zip(columns, DECISIONS):
+                button_type = "primary" if decision == "No" else "secondary"
+                if column.button(
+                    decision,
+                    key=f"{event_id}-{decision}",
+                    type=button_type,
+                    use_container_width=True,
+                ):
+                    try:
+                        api_request(
+                            "POST",
+                            f"/security-events/{event_id}/human-response",
+                            json={"responder": identity, "response": decision},
+                        )
+                        st.rerun()
+                    except RuntimeError as exc:
+                        st.error(str(exc))
 
 
 st.set_page_config(
@@ -265,7 +338,7 @@ with header_left:
         unsafe_allow_html=True,
     )
 with header_right:
-    if st.button("↻  Refresh", use_container_width=True):
+    if st.button("↻  Refresh", key="refresh-chat", use_container_width=True):
         st.rerun()
 st.markdown('<div class="channel-rule"></div>', unsafe_allow_html=True)
 

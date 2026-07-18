@@ -7,8 +7,11 @@ from uuid import UUID
 from fastapi import FastAPI, HTTPException, status
 
 from ai_context import AIContextUnavailableError, analyze_context
+from coordinator import deliver_coordinator_callback
 
 from models import (
+    CallbackStatus,
+    CoordinatorDeliveryResult,
     HealthResponse,
     HumanResponseCreate,
     Message,
@@ -17,6 +20,8 @@ from models import (
     SecurityEvent,
 )
 from store import (
+    CallbackNotAvailableError,
+    CallbackNotRetryableError,
     EventNotFoundError,
     InMemoryStore,
     ResponseAlreadyRecordedError,
@@ -26,7 +31,7 @@ from store import (
 
 app = FastAPI(
     title="Workplace Security Chat MVP",
-    version="0.1.0",
+    version="0.2.0",
     description="Local group chat, AI context analysis, and human verification.",
 )
 app.state.store = InMemoryStore()
@@ -34,6 +39,19 @@ app.state.store = InMemoryStore()
 
 def get_store() -> InMemoryStore:
     return app.state.store
+
+
+async def _deliver_and_record_callback(event: SecurityEvent) -> SecurityEvent:
+    """Complete one delivery attempt while preserving the stored response."""
+
+    try:
+        result = await deliver_coordinator_callback(event)
+    except Exception:  # Defensive boundary around an optional external service.
+        result = CoordinatorDeliveryResult(
+            status=CallbackStatus.FAILED,
+            last_error="Coordinator delivery failed unexpectedly.",
+        )
+    return get_store().finish_callback_attempt(event.id, result)
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -89,7 +107,10 @@ async def record_human_response(
     event_id: UUID, response: HumanResponseCreate
 ) -> SecurityEvent:
     try:
-        return get_store().record_human_response(event_id, response)
+        get_store().record_human_response(event_id, response)
+        pending_event = get_store().begin_callback_attempt(
+            event_id, is_retry=False
+        )
     except EventNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Security event not found.") from exc
     except ResponseAlreadyRecordedError as exc:
@@ -99,3 +120,29 @@ async def record_human_response(
         ) from exc
     except WrongResponderError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except (CallbackNotAvailableError, CallbackNotRetryableError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    return await _deliver_and_record_callback(pending_event)
+
+
+@app.post(
+    "/security-events/{event_id}/coordinator-callback/retry",
+    response_model=SecurityEvent,
+)
+async def retry_coordinator_callback(event_id: UUID) -> SecurityEvent:
+    try:
+        pending_event = get_store().begin_callback_attempt(
+            event_id, is_retry=True
+        )
+    except EventNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Security event not found.") from exc
+    except CallbackNotAvailableError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="No coordinator callback is available for this event.",
+        ) from exc
+    except CallbackNotRetryableError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    return await _deliver_and_record_callback(pending_event)

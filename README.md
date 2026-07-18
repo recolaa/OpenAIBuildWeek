@@ -4,10 +4,14 @@ This local hackathon component receives suspicious privileged-request alerts,
 posts a targeted verification question into a workplace group chat, and records
 the named person's `Yes`, `No`, or `Unsure` response.
 
-The MVP implements chat, OpenAI context analysis, and the complete human
-verification flow. Coordinator callback delivery remains deferred. OpenAI
-analysis is stored as structured Pydantic data and is informational only; it can
-never authorize an admin request.
+The MVP implements chat, OpenAI context analysis, the complete human verification
+flow, and outbound coordinator callback delivery. OpenAI analysis is stored as
+structured Pydantic data and is informational only; it can never authorize an
+admin request.
+
+After a human responds, the backend sends a summarized, idempotent callback to
+the configured coordinator. Callback failure never removes or rolls back the
+human response, and failed deliveries can be retried manually.
 
 Each completed analysis contains `observed_facts`, `relevant_message_ids`,
 `inference`, `unresolved_issue`, `verification_target`, `verification_question`,
@@ -20,6 +24,8 @@ with values derived from the alert before storage.
 - Verification target and question are derived from the network alert, not chat text.
 - AI-reported message IDs are rejected unless they were included in the supplied context.
 - Human verification is posted even when the OpenAI API is unavailable.
+- Coordinator callbacks contain a context summary and relevant IDs, never full chat history.
+- A stable callback ID is reused for retries and sent as the idempotency key.
 - The identity selector is a demo convenience, not authentication.
 - Storage is process-local and is erased whenever the backend restarts.
 - Do not use this MVP to approve or execute privileged actions.
@@ -36,6 +42,10 @@ cp .env.example .env
 Set `OPENAI_API_KEY` and `OPENAI_MODEL` in `.env`. Keep `.env` local; it is
 ignored by Git. Without a usable AI configuration, alerts are still persisted
 and verified, with `analysis_status: "failed"` and an understandable error.
+
+Set `COORDINATOR_RESPONSE_URL` to the coordinator endpoint that receives human
+responses. If it is missing or unavailable, the response remains stored and the
+event records a failed callback that can be retried.
 
 ## Run
 
@@ -80,7 +90,8 @@ curl -X POST http://localhost:8003/network-alerts \
     "actor":"Alice",
     "request_summary":"grant database-admin to deployment-bot",
     "target_resource":"production database",
-    "source_ip":"203.0.113.10"
+    "source_ip":"203.0.113.10",
+    "network_risk_score":0.94
   }'
 ```
 
@@ -93,6 +104,23 @@ curl -X POST http://localhost:8003/security-events/EVENT_ID/human-response \
   -d '{"responder":"Alice","response":"Unsure"}'
 ```
 
+If coordinator delivery fails, retry the same stable callback ID with:
+
+```bash
+curl -X POST \
+  http://localhost:8003/security-events/EVENT_ID/coordinator-callback/retry
+```
+
+The coordinator receives only these fields:
+
+- `callback_id`, also sent as the `Idempotency-Key` header
+- `event_id`, `account_user`, `responded_by`, and `human_response`
+- `responded_at`, `context_summary`, and `relevant_message_ids`
+- `network_risk_score`
+
+A JSON coordinator response may provide `final_coordinator_decision`,
+`final_decision`, or `decision`; the value is stored on the event when present.
+
 ## Endpoints
 
 - `GET /health`
@@ -101,6 +129,7 @@ curl -X POST http://localhost:8003/security-events/EVENT_ID/human-response \
 - `POST /network-alerts`
 - `GET /security-events/{event_id}`
 - `POST /security-events/{event_id}/human-response`
+- `POST /security-events/{event_id}/coordinator-callback/retry`
 
 ## Tests
 
@@ -108,8 +137,8 @@ curl -X POST http://localhost:8003/security-events/EVENT_ID/human-response \
 make test
 ```
 
-The endpoint and AI tests use an isolated in-memory store and mocked OpenAI
-clients. The test suite makes no external API calls.
+The endpoint, AI, and coordinator tests use an isolated in-memory store and
+mocked network clients. The test suite makes no external API calls.
 
 ## Project layout
 
@@ -118,4 +147,6 @@ clients. The test suite makes no external API calls.
 - `models.py` — Pydantic request and response contracts
 - `store.py` — thread-safe in-memory storage
 - `ai_context.py` — grounded Responses API structured-output integration
+- `coordinator.py` — async summarized callback delivery
 - `tests/test_backend.py` — endpoint tests
+- `tests/test_coordinator.py` — mocked coordinator delivery tests

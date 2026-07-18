@@ -73,6 +73,7 @@ class NetworkAlertCreate(BaseModel):
     request_summary: NonEmptyText = Field(max_length=1_000)
     target_resource: Optional[NonEmptyText] = Field(default=None, max_length=500)
     source_ip: Optional[NonEmptyText] = Field(default=None, max_length=64)
+    network_risk_score: float = Field(default=1.0, ge=0.0, le=1.0)
     detected_at: datetime = Field(default_factory=utc_now)
 
 
@@ -103,6 +104,34 @@ class HumanResponse(BaseModel):
     responded_at: datetime = Field(default_factory=utc_now)
 
 
+class CallbackStatus(str, Enum):
+    PENDING = "pending"
+    DELIVERED = "delivered"
+    FAILED = "failed"
+
+
+class CoordinatorCallbackState(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    callback_id: UUID = Field(default_factory=uuid4)
+    status: CallbackStatus = CallbackStatus.PENDING
+    response_status_code: Optional[int] = Field(default=None, ge=100, le=599)
+    attempt_count: int = Field(default=0, ge=0)
+    last_error: Optional[str] = None
+    coordinator_decision: Optional[str] = None
+
+
+class CoordinatorDeliveryResult(BaseModel):
+    """Internal result returned by the outbound coordinator client."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: CallbackStatus
+    response_status_code: Optional[int] = Field(default=None, ge=100, le=599)
+    last_error: Optional[str] = None
+    coordinator_decision: Optional[str] = None
+
+
 class SecurityEvent(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -114,7 +143,7 @@ class SecurityEvent(BaseModel):
     analysis_error: Optional[str] = None
     verification_message_id: UUID
     human_response: Optional[HumanResponse] = None
-    coordinator_delivery_error: Optional[str] = None
+    coordinator_callback: Optional[CoordinatorCallbackState] = None
 
 
 class HealthResponse(BaseModel):

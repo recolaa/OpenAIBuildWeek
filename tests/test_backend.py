@@ -11,7 +11,11 @@ import pytest
 import backend
 from ai_context import AIContextUnavailableError
 from backend import app
-from models import AIContextResult
+from models import (
+    AIContextResult,
+    CallbackStatus,
+    CoordinatorDeliveryResult,
+)
 
 
 pytestmark = pytest.mark.anyio
@@ -29,9 +33,18 @@ def reset_store(monkeypatch: pytest.MonkeyPatch) -> None:
     async def unavailable_analysis(*args: object) -> None:
         raise AIContextUnavailableError("Mocked OpenAI outage.")
 
+    async def unavailable_coordinator(*args: object) -> CoordinatorDeliveryResult:
+        return CoordinatorDeliveryResult(
+            status=CallbackStatus.FAILED,
+            last_error="Mocked coordinator outage.",
+        )
+
     # Every alert test is isolated from the network. Individual success tests
     # replace this default with a structured fake result.
     monkeypatch.setattr(backend, "analyze_context", unavailable_analysis)
+    monkeypatch.setattr(
+        backend, "deliver_coordinator_callback", unavailable_coordinator
+    )
 
 
 @pytest.fixture
@@ -170,6 +183,8 @@ async def test_target_can_record_each_supported_human_response(
     )
     assert response.status_code == 201
     assert response.json()["human_response"]["response"] == decision
+    assert response.json()["coordinator_callback"]["status"] == "failed"
+    assert response.json()["coordinator_callback"]["attempt_count"] == 1
 
 
 async def test_wrong_person_cannot_answer_verification(
@@ -204,3 +219,117 @@ async def test_rejects_unknown_human_response(client: httpx.AsyncClient) -> None
         json={"responder": "Alice", "response": "Probably"},
     )
     assert response.status_code == 422
+
+
+async def test_successful_coordinator_delivery_records_result(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str] = []
+
+    async def delivered(event: object) -> CoordinatorDeliveryResult:
+        calls.append(str(event.coordinator_callback.callback_id))
+        return CoordinatorDeliveryResult(
+            status=CallbackStatus.DELIVERED,
+            response_status_code=202,
+            coordinator_decision="escalate",
+        )
+
+    monkeypatch.setattr(backend, "deliver_coordinator_callback", delivered)
+    event = await create_alert(client)
+    response = await client.post(
+        f"/security-events/{event['id']}/human-response",
+        json={"responder": "Alice", "response": "No"},
+    )
+
+    assert response.status_code == 201
+    callback = response.json()["coordinator_callback"]
+    assert callback["status"] == "delivered"
+    assert callback["response_status_code"] == 202
+    assert callback["attempt_count"] == 1
+    assert callback["last_error"] is None
+    assert callback["coordinator_decision"] == "escalate"
+    assert calls == [callback["callback_id"]]
+
+
+async def test_failed_callback_can_retry_with_same_id(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    callback_ids: list[str] = []
+
+    async def fail_then_succeed(event: object) -> CoordinatorDeliveryResult:
+        callback_ids.append(str(event.coordinator_callback.callback_id))
+        if len(callback_ids) == 1:
+            return CoordinatorDeliveryResult(
+                status=CallbackStatus.FAILED,
+                response_status_code=503,
+                last_error="Coordinator returned HTTP 503.",
+            )
+        return CoordinatorDeliveryResult(
+            status=CallbackStatus.DELIVERED,
+            response_status_code=200,
+            coordinator_decision="deny",
+        )
+
+    monkeypatch.setattr(
+        backend, "deliver_coordinator_callback", fail_then_succeed
+    )
+    event = await create_alert(client)
+    first = await client.post(
+        f"/security-events/{event['id']}/human-response",
+        json={"responder": "Alice", "response": "Unsure"},
+    )
+    first_body = first.json()
+    assert first_body["human_response"]["response"] == "Unsure"
+    assert first_body["coordinator_callback"]["status"] == "failed"
+    assert first_body["coordinator_callback"]["response_status_code"] == 503
+    assert first_body["coordinator_callback"]["attempt_count"] == 1
+
+    retried = await client.post(
+        f"/security-events/{event['id']}/coordinator-callback/retry"
+    )
+    assert retried.status_code == 200
+    retry_callback = retried.json()["coordinator_callback"]
+    assert retry_callback["status"] == "delivered"
+    assert retry_callback["attempt_count"] == 2
+    assert retry_callback["coordinator_decision"] == "deny"
+    assert callback_ids == [
+        first_body["coordinator_callback"]["callback_id"],
+        first_body["coordinator_callback"]["callback_id"],
+    ]
+
+
+async def test_duplicate_delivery_is_not_sent_twice(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    delivery_count = 0
+
+    async def delivered(event: object) -> CoordinatorDeliveryResult:
+        nonlocal delivery_count
+        delivery_count += 1
+        return CoordinatorDeliveryResult(
+            status=CallbackStatus.DELIVERED,
+            response_status_code=200,
+        )
+
+    monkeypatch.setattr(backend, "deliver_coordinator_callback", delivered)
+    event = await create_alert(client)
+    response_path = f"/security-events/{event['id']}/human-response"
+    payload = {"responder": "Alice", "response": "Yes"}
+
+    assert (await client.post(response_path, json=payload)).status_code == 201
+    assert (await client.post(response_path, json=payload)).status_code == 409
+    retry = await client.post(
+        f"/security-events/{event['id']}/coordinator-callback/retry"
+    )
+    assert retry.status_code == 409
+    assert delivery_count == 1
+
+
+async def test_retry_requires_a_stored_failed_callback(
+    client: httpx.AsyncClient,
+) -> None:
+    event = await create_alert(client)
+    response = await client.post(
+        f"/security-events/{event['id']}/coordinator-callback/retry"
+    )
+    assert response.status_code == 409

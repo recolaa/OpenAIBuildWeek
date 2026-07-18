@@ -9,6 +9,9 @@ from uuid import UUID, uuid4
 from models import (
     AIContextResult,
     AnalysisStatus,
+    CallbackStatus,
+    CoordinatorCallbackState,
+    CoordinatorDeliveryResult,
     HumanResponse,
     HumanResponseCreate,
     Message,
@@ -29,6 +32,14 @@ class ResponseAlreadyRecordedError(RuntimeError):
 
 
 class WrongResponderError(ValueError):
+    pass
+
+
+class CallbackNotAvailableError(RuntimeError):
+    pass
+
+
+class CallbackNotRetryableError(RuntimeError):
     pass
 
 
@@ -143,9 +154,81 @@ class InMemoryStore:
                     "human_response": HumanResponse(
                         responder=response.responder,
                         response=response.response,
-                    )
+                    ),
+                    "coordinator_callback": CoordinatorCallbackState(),
                 },
                 deep=True,
+            )
+            self._events[event_id] = updated
+            return updated.model_copy(deep=True)
+
+    def begin_callback_attempt(
+        self, event_id: UUID, *, is_retry: bool
+    ) -> SecurityEvent:
+        """Atomically reserve one initial or retry delivery attempt."""
+
+        with self._lock:
+            event = self._events.get(event_id)
+            if event is None:
+                raise EventNotFoundError(str(event_id))
+            callback = event.coordinator_callback
+            if event.human_response is None or callback is None:
+                raise CallbackNotAvailableError(str(event_id))
+
+            if is_retry:
+                if callback.status != CallbackStatus.FAILED:
+                    raise CallbackNotRetryableError(
+                        "Only failed coordinator callbacks can be retried."
+                    )
+            elif callback.status != CallbackStatus.PENDING or callback.attempt_count != 0:
+                raise CallbackNotRetryableError(
+                    "The coordinator callback delivery has already been attempted."
+                )
+
+            pending = callback.model_copy(
+                update={
+                    "status": CallbackStatus.PENDING,
+                    "attempt_count": callback.attempt_count + 1,
+                    "response_status_code": None,
+                    "last_error": None,
+                    "coordinator_decision": None,
+                },
+                deep=True,
+            )
+            updated = event.model_copy(
+                update={"coordinator_callback": pending}, deep=True
+            )
+            self._events[event_id] = updated
+            return updated.model_copy(deep=True)
+
+    def finish_callback_attempt(
+        self, event_id: UUID, result: CoordinatorDeliveryResult
+    ) -> SecurityEvent:
+        """Record an outbound result without modifying the human response."""
+
+        with self._lock:
+            event = self._events.get(event_id)
+            if event is None:
+                raise EventNotFoundError(str(event_id))
+            callback = event.coordinator_callback
+            if callback is None:
+                raise CallbackNotAvailableError(str(event_id))
+            if callback.status != CallbackStatus.PENDING or callback.attempt_count < 1:
+                raise CallbackNotRetryableError(
+                    "No coordinator callback attempt is currently pending."
+                )
+
+            completed = callback.model_copy(
+                update={
+                    "status": result.status,
+                    "response_status_code": result.response_status_code,
+                    "last_error": result.last_error,
+                    "coordinator_decision": result.coordinator_decision,
+                },
+                deep=True,
+            )
+            updated = event.model_copy(
+                update={"coordinator_callback": completed}, deep=True
             )
             self._events[event_id] = updated
             return updated.model_copy(deep=True)
