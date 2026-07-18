@@ -6,4 +6,6 @@ __pycache__/
 .coverage
 htmlcov/
 .streamlit/secrets.toml
-
+*.db
+*.db-shm
+*.db-wal

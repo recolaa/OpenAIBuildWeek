@@ -3,8 +3,9 @@
 ## Scope
 
 This repository is a local cybersecurity hackathon MVP. Keep it small: FastAPI,
-Streamlit, OpenAI Responses API, Pydantic models, and in-memory storage. Do not add
-real authentication, Slack integration, Docker, or a database unless requested.
+Streamlit, OpenAI Responses API, Pydantic models, and local SQLite persistence.
+Do not add real authentication, Slack integration, Docker, or another database
+unless requested.
 
 ## Security invariants
 
@@ -21,7 +22,7 @@ real authentication, Slack integration, Docker, or a database unless requested.
 - Use Python type hints and Pydantic v2 models.
 - Keep endpoint logic thin; place state operations in `store.py` and AI calls in
   `ai_context.py`.
-- Preserve in-memory test isolation with `app.state.store.reset()`.
+- Use temporary SQLite databases for test isolation; never use the developer's
+  persistent history file in tests.
 - Mock all OpenAI and coordinator network calls in tests.
 - Run `make test` before handing off changes.
-

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import os
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, status
+from dotenv import load_dotenv
 
 from ai_context import AIContextUnavailableError, analyze_context
 from coordinator import deliver_coordinator_callback
@@ -23,21 +25,22 @@ from store import (
     CallbackNotAvailableError,
     CallbackNotRetryableError,
     EventNotFoundError,
-    InMemoryStore,
     ResponseAlreadyRecordedError,
+    SQLiteStore,
     WrongResponderError,
 )
 
 
+load_dotenv()
 app = FastAPI(
     title="Workplace Security Chat MVP",
     version="0.2.0",
     description="Local group chat, AI context analysis, and human verification.",
 )
-app.state.store = InMemoryStore()
+app.state.store = SQLiteStore(os.getenv("DATABASE_PATH", "chat_history.db"))
 
 
-def get_store() -> InMemoryStore:
+def get_store() -> SQLiteStore:
     return app.state.store
 
 

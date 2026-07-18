@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
+from pathlib import Path
 from uuid import uuid4
 
 import httpx
@@ -16,6 +17,7 @@ from models import (
     CallbackStatus,
     CoordinatorDeliveryResult,
 )
+from store import SQLiteStore
 
 
 pytestmark = pytest.mark.anyio
@@ -27,8 +29,12 @@ def anyio_backend() -> str:
 
 
 @pytest.fixture(autouse=True)
-def reset_store(monkeypatch: pytest.MonkeyPatch) -> None:
-    app.state.store.reset()
+def reset_store(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> Iterator[None]:
+    original_store = app.state.store
+    test_store = SQLiteStore(tmp_path / "backend-test.db")
+    app.state.store = test_store
 
     async def unavailable_analysis(*args: object) -> None:
         raise AIContextUnavailableError("Mocked OpenAI outage.")
@@ -45,6 +51,9 @@ def reset_store(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         backend, "deliver_coordinator_callback", unavailable_coordinator
     )
+    yield
+    test_store.close()
+    app.state.store = original_store
 
 
 @pytest.fixture

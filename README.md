@@ -2,7 +2,7 @@
 
 This local hackathon component receives suspicious privileged-request alerts,
 posts a targeted verification question into a workplace group chat, and records
-the named person's `Yes`, `No`, or `Unsure` response.
+the named person's `Yes`, `No`, or `Unsure` response in local SQLite history.
 
 The MVP implements chat, OpenAI context analysis, the complete human verification
 flow, and outbound coordinator callback delivery. OpenAI analysis is stored as
@@ -27,7 +27,8 @@ with values derived from the alert before storage.
 - Coordinator callbacks contain a context summary and relevant IDs, never full chat history.
 - A stable callback ID is reused for retries and sent as the idempotency key.
 - The identity selector is a demo convenience, not authentication.
-- Storage is process-local and is erased whenever the backend restarts.
+- Chat and security-event history is stored locally as plaintext SQLite data;
+  protect the database file and do not commit it.
 - Do not use this MVP to approve or execute privileged actions.
 
 ## Setup
@@ -46,6 +47,11 @@ and verified, with `analysis_status: "failed"` and an understandable error.
 Set `COORDINATOR_RESPONSE_URL` to the coordinator endpoint that receives human
 responses. If it is missing or unavailable, the response remains stored and the
 event records a failed callback that can be retried.
+
+`DATABASE_PATH` controls the local SQLite file and defaults to `chat_history.db`.
+The database persists messages, events, AI context, human responses, current
+callback state, and every callback attempt across backend restarts. SQLite files
+are excluded from Git.
 
 ## Run
 
@@ -77,7 +83,7 @@ Post an ordinary context message:
 ```bash
 curl -X POST http://localhost:8003/messages \
   -H 'Content-Type: application/json' \
-  -d '{"author":"Alice","content":"I am traveling and expect to use a VPN."}'
+  -d '{"author":"Sicily","content":"I am traveling and expect to use a VPN."}'
 ```
 
 Post a network alert:
@@ -87,7 +93,7 @@ curl -X POST http://localhost:8003/network-alerts \
   -H 'Content-Type: application/json' \
   -d '{
     "alert_id":"monitor-42",
-    "actor":"Alice",
+    "actor":"Sicily",
     "request_summary":"grant database-admin to deployment-bot",
     "target_resource":"production database",
     "source_ip":"203.0.113.10",
@@ -101,7 +107,7 @@ response buttons. The same response can be submitted directly:
 ```bash
 curl -X POST http://localhost:8003/security-events/EVENT_ID/human-response \
   -H 'Content-Type: application/json' \
-  -d '{"responder":"Alice","response":"Unsure"}'
+  -d '{"responder":"Sicily","response":"Unsure"}'
 ```
 
 If coordinator delivery fails, retry the same stable callback ID with:
@@ -137,16 +143,18 @@ A JSON coordinator response may provide `final_coordinator_decision`,
 make test
 ```
 
-The endpoint, AI, and coordinator tests use an isolated in-memory store and
-mocked network clients. The test suite makes no external API calls.
+The endpoint, AI, and coordinator tests use isolated temporary SQLite databases
+and mocked network clients. The test suite makes no external API calls and does
+not modify the developer's history database.
 
 ## Project layout
 
 - `backend.py` — FastAPI routes
 - `ui.py` — Streamlit chat interface
 - `models.py` — Pydantic request and response contracts
-- `store.py` — thread-safe in-memory storage
+- `store.py` — thread-safe SQLite persistence and callback audit history
 - `ai_context.py` — grounded Responses API structured-output integration
 - `coordinator.py` — async summarized callback delivery
 - `tests/test_backend.py` — endpoint tests
 - `tests/test_coordinator.py` — mocked coordinator delivery tests
+- `tests/test_store.py` — restart-persistence and audit-history tests

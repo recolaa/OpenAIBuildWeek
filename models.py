@@ -132,6 +132,21 @@ class CoordinatorDeliveryResult(BaseModel):
     coordinator_decision: Optional[str] = None
 
 
+class CoordinatorCallbackAttempt(BaseModel):
+    """Durable audit record for one coordinator delivery attempt."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    callback_id: UUID
+    attempt_number: int = Field(ge=1)
+    status: CallbackStatus
+    started_at: datetime
+    completed_at: Optional[datetime] = None
+    response_status_code: Optional[int] = Field(default=None, ge=100, le=599)
+    last_error: Optional[str] = None
+    coordinator_decision: Optional[str] = None
+
+
 class SecurityEvent(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -144,6 +159,9 @@ class SecurityEvent(BaseModel):
     verification_message_id: UUID
     human_response: Optional[HumanResponse] = None
     coordinator_callback: Optional[CoordinatorCallbackState] = None
+    coordinator_callback_attempts: list[CoordinatorCallbackAttempt] = Field(
+        default_factory=list
+    )
 
 
 class HealthResponse(BaseModel):

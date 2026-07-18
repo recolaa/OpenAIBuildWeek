@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 load_dotenv()
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8003").rstrip("/")
 REQUEST_TIMEOUT = 5.0
-DEMO_MEMBERS = ("Alice", "Bob", "Carol", "Dave")
+DEMO_MEMBERS = ("Sicily", "Eitan", "Hayden", "Reuben")
 DECISIONS = ("Yes", "No", "Unsure")
 
 
@@ -154,6 +154,14 @@ def inject_styles() -> None:
         [class*="st-key-refresh-chat"] button span,
         [class*="st-key-refresh-chat"] button div {
             color: #ffffff !important;
+        }
+        [data-testid="stMain"] [data-testid="stExpander"] details > summary,
+        [data-testid="stMain"] [data-testid="stExpander"] details > summary p,
+        [data-testid="stMain"] [data-testid="stExpander"] details > summary span {
+            color: #ffffff !important;
+        }
+        [data-testid="stMain"] [data-testid="stExpander"] details > summary svg {
+            fill: #ffffff !important; color: #ffffff !important;
         }
         [data-testid="stChatInput"] { border-color: #d7dce5; box-shadow: 0 8px 28px rgba(31,41,55,.08); }
         #MainMenu, footer { visibility: hidden; }
