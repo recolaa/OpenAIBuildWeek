@@ -16,5 +16,4 @@ ui:
 	$(PYTHON) -m streamlit run ui.py
 
 test:
-	$(PYTHON) -m pytest -q
-
+	$(PYTHON) -m pytest -vv -ra --durations=10

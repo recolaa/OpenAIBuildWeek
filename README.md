@@ -146,6 +146,8 @@ make test
 The endpoint, AI, and coordinator tests use isolated temporary SQLite databases
 and mocked network clients. The test suite makes no external API calls and does
 not modify the developer's history database.
+The command prints every test name and result, a short summary for skipped or
+failed tests, and the ten slowest test durations.
 
 ## Project layout
 
