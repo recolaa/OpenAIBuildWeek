@@ -1,0 +1,9 @@
+fastapi>=0.115,<1
+httpx>=0.27,<1
+openai>=1.50,<3
+pydantic>=2.8,<3
+python-dotenv>=1.0,<2
+pytest>=8.3,<10
+streamlit>=1.39,<2
+uvicorn[standard]>=0.30,<1
+
