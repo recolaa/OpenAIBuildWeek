@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intentbridge.local/contracts/chat-context-response-v1.schema.json",
+  "title": "IntentBridge chat context response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "response_id",
+    "request_id",
+    "event_id",
+    "incident_id",
+    "incident_version",
+    "context_round",
+    "provided_context",
+    "provided_by",
+    "issued_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "chat-context-response-v1"
+    },
+    "response_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "request_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "event_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "incident_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "incident_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "context_round": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100
+    },
+    "provided_context": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4096
+      }
+    },
+    "provided_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "role"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "role": {
+          "$ref": "#/$defs/identifier"
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      }
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "trust": {
+      "const": "UNTRUSTED_ADVISORY",
+      "default": "UNTRUSTED_ADVISORY"
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}$"
+    }
+  }
+}

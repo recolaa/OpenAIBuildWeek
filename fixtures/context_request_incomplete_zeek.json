@@ -1,0 +1,33 @@
+{
+  "schema_version": "context-request-v1",
+  "request_id": "ctx-zeek-notice-51",
+  "event_id": "zeek-notice-51",
+  "incident_id": "inc-zeek-notice-51",
+  "incident_version": 1,
+  "context_round": 1,
+  "previous_request_id": null,
+  "type": "NETWORK_ACCESS_CONTEXT",
+  "severity": "high",
+  "created_at": "2026-07-18T17:00:02Z",
+  "expires_at": "2026-07-18T17:02:02Z",
+  "matched_policy": {
+    "rule_id": "NO_MATCHED_POLICY",
+    "description": "No enforceable exact-flow policy was matched by this incomplete Zeek notice",
+    "maximum_ttl_seconds": 60
+  },
+  "agent_analysis": {
+    "summary": "Zeek reported a notice without enough validated endpoint information for a scoped network change.",
+    "missing_context": [
+      "The source and destination associated with this notice",
+      "Whether this activity is expected for the affected asset owner"
+    ],
+    "trust": "UNTRUSTED_ADVISORY"
+  },
+  "question": "Can an operator identify the endpoints associated with this Zeek notice and confirm whether the activity is expected?",
+  "allowed_responses": [
+    "KEEP_CURRENT_POLICY",
+    "DENY",
+    "REQUEST_MORE_INFORMATION"
+  ],
+  "maximum_ttl_seconds": 60
+}

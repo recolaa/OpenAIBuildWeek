@@ -1,0 +1,10 @@
+{
+  "schema_version": "enforcement-result-v1",
+  "decision_id": "decision-901",
+  "event_id": "drop-1042",
+  "incident_id": "inc-drop-1042",
+  "status": "APPLIED",
+  "reason_code": "EXACT_SCOPE_TEMPORARY_GRANT",
+  "firewall_rule_id": "ctx-inc-drop-1042",
+  "expires_at": "2026-07-18T17:06:14Z"
+}

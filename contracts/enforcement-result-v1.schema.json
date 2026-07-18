@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intentbridge.local/contracts/enforcement-result-v1.schema.json",
+  "title": "IntentBridge enforcement result v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "decision_id",
+    "event_id",
+    "status",
+    "reason_code"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "enforcement-result-v1"
+    },
+    "decision_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "event_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "incident_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "status": {
+      "enum": ["APPLIED", "REJECTED", "REVOKED", "FAILED"]
+    },
+    "reason_code": {
+      "enum": [
+        "EXACT_SCOPE_TEMPORARY_GRANT",
+        "EXACT_SCOPE_TEMPORARY_BLOCK",
+        "CURRENT_POLICY_RETAINED",
+        "DECISION_DENIED",
+        "MORE_INFORMATION_REQUIRED",
+        "SCOPE_MISMATCH",
+        "TTL_EXCEEDS_POLICY",
+        "TTL_INVALID",
+        "REQUEST_EXPIRED",
+        "REPLAYED_DECISION",
+        "APPROVER_NOT_ALLOWED",
+        "STALE_INCIDENT_VERSION",
+        "INCIDENT_NOT_FOUND",
+        "REQUEST_MISMATCH",
+        "INVALID_INCIDENT_STATE",
+        "POLICY_DISALLOWS_EXCEPTION",
+        "MALFORMED_DECISION",
+        "FIREWALL_ERROR",
+        "RULE_EXPIRED",
+        "RULE_REVOKED",
+        "INTERNAL_ERROR"
+      ]
+    },
+    "firewall_rule_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "detail": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "APPLIED"
+          }
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "required": ["firewall_rule_id", "expires_at"]
+      }
+    }
+  ],
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}$"
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "schema_version": "agent-analysis-v1",
+  "summary": "A host attempted HTTPS access and was blocked because the source matched the VPN-source rule.",
+  "observed_facts": [
+    "Source IP is 10.0.2.1",
+    "Destination is 10.0.3.10:443 over TCP",
+    "The matched rule is BLOCK_VPN_SOURCE"
+  ],
+  "inferences": [
+    "The flow could be legitimate remote maintenance",
+    "It could also be unauthorized VPN use"
+  ],
+  "missing_context": [
+    "Whether this source is associated with an authorized user",
+    "Whether access to this service is currently expected"
+  ],
+  "recommended_action": "REQUEST_CONTEXT",
+  "question": "Is this source currently authorized for temporary HTTPS access to 10.0.3.10?",
+  "confidence": 0.91
+}

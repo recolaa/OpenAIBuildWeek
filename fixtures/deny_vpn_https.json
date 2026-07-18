@@ -1,0 +1,15 @@
+{
+  "schema_version": "decision-v1",
+  "decision_id": "decision-902",
+  "request_id": "ctx-drop-1042",
+  "event_id": "drop-1042",
+  "incident_id": "inc-drop-1042",
+  "incident_version": 1,
+  "decision": "DENY",
+  "approved_by": {
+    "id": "security-7",
+    "role": "security-operator"
+  },
+  "justification": "No authorized maintenance is scheduled for this source",
+  "issued_at": "2026-07-18T17:01:20Z"
+}

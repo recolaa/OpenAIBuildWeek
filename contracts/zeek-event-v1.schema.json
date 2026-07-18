@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intentbridge.local/contracts/zeek-event-v1.schema.json",
+  "title": "IntentBridge Zeek event wrapper v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "log_type",
+    "record"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "zeek-event-v1"
+    },
+    "event_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "log_type": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "sensor_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}$"
+    },
+    "record": {
+      "type": "object",
+      "maxProperties": 512,
+      "propertyNames": {
+        "maxLength": 256
+      },
+      "additionalProperties": true,
+      "$comment": "The wrapper is strict. Only record is arbitrary, and the application caps it at 24 KiB, eight levels, 512 total nodes, finite numbers, and 8 KiB strings."
+    }
+  }
+}

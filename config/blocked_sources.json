@@ -1,0 +1,7 @@
+{
+  "10.0.2.1": {
+    "category": "demo-vpn-source",
+    "confidence": 0.8,
+    "source": "static-demo-fixture"
+  }
+}

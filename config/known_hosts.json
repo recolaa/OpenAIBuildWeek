@@ -1,0 +1,15 @@
+{
+  "10.0.3.10": {
+    "name": "protected-demo-server",
+    "role": "https-service",
+    "owner": "demo-team",
+    "criticality": "high"
+  },
+  "10.0.2.1": {
+    "name": "demo-client",
+    "role": "client",
+    "owner": "unconfirmed",
+    "criticality": "low"
+  }
+}
+

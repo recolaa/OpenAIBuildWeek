@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intentbridge.local/contracts/agent-analysis-v1.schema.json",
+  "title": "IntentBridge network-agent analysis v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "summary",
+    "observed_facts",
+    "inferences",
+    "missing_context",
+    "recommended_action",
+    "question",
+    "confidence"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "agent-analysis-v1"
+    },
+    "summary": {
+      "$ref": "#/$defs/description"
+    },
+    "observed_facts": {
+      "$ref": "#/$defs/statements"
+    },
+    "inferences": {
+      "$ref": "#/$defs/statements"
+    },
+    "missing_context": {
+      "$ref": "#/$defs/statements"
+    },
+    "recommended_action": {
+      "enum": [
+        "REQUEST_CONTEXT",
+        "KEEP_BLOCKED",
+        "ESCALATE",
+        "IGNORE_DUPLICATE"
+      ]
+    },
+    "question": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/description"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "recommended_action": {
+            "const": "REQUEST_CONTEXT"
+          }
+        },
+        "required": ["recommended_action"]
+      },
+      "then": {
+        "properties": {
+          "question": {
+            "$ref": "#/$defs/description"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "recommended_action": {
+            "const": "IGNORE_DUPLICATE"
+          }
+        },
+        "required": ["recommended_action"]
+      },
+      "then": {
+        "properties": {
+          "question": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    },
+    "statements": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "$ref": "#/$defs/description"
+      }
+    }
+  }
+}

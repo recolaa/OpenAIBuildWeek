@@ -1,0 +1,22 @@
+{
+  "schema_version": "decision-v1",
+  "decision_id": "decision-903",
+  "request_id": "ctx-alert-2048",
+  "event_id": "alert-2048",
+  "incident_id": "inc-alert-2048",
+  "incident_version": 1,
+  "decision": "BLOCK_TEMPORARY",
+  "grant_scope": {
+    "source_ip": "10.0.2.44",
+    "destination_ip": "10.0.3.10",
+    "destination_port": 22,
+    "protocol": "tcp"
+  },
+  "ttl_seconds": 600,
+  "approved_by": {
+    "id": "security-7",
+    "role": "security-operator"
+  },
+  "justification": "Contain this exact SSH service flow while the asset owner investigates",
+  "issued_at": "2026-07-18T22:01:20Z"
+}

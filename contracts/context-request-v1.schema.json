@@ -1,0 +1,406 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intentbridge.local/contracts/context-request-v1.schema.json",
+  "title": "IntentBridge context request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "event_id",
+    "incident_id",
+    "incident_version",
+    "type",
+    "severity",
+    "created_at",
+    "expires_at",
+    "matched_policy",
+    "agent_analysis",
+    "question",
+    "allowed_responses",
+    "maximum_ttl_seconds"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "context-request-v1"
+    },
+    "request_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "event_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "incident_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "incident_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "context_round": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100,
+      "default": 1
+    },
+    "previous_request_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/identifier"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "type": {
+      "const": "NETWORK_ACCESS_CONTEXT"
+    },
+    "severity": {
+      "enum": ["info", "low", "medium", "high", "critical"]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "observed_flow": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/observed_flow"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "permitted_grant_scope": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/flow_scope"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "matched_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rule_id",
+        "description",
+        "maximum_ttl_seconds"
+      ],
+      "properties": {
+        "rule_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "description": {
+          "$ref": "#/$defs/description"
+        },
+        "maximum_ttl_seconds": {
+          "$ref": "#/$defs/ttl"
+        }
+      }
+    },
+    "agent_analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "missing_context"],
+      "properties": {
+        "summary": {
+          "$ref": "#/$defs/description"
+        },
+        "missing_context": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/description"
+          }
+        },
+        "trust": {
+          "const": "UNTRUSTED_ADVISORY",
+          "default": "UNTRUSTED_ADVISORY"
+        }
+      }
+    },
+    "question": {
+      "$ref": "#/$defs/description"
+    },
+    "allowed_responses": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/decision"
+      }
+    },
+    "maximum_ttl_seconds": {
+      "$ref": "#/$defs/ttl"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["observed_flow"],
+        "properties": {
+          "observed_flow": {
+            "type": "object"
+          }
+        }
+      },
+      "then": {
+        "required": ["permitted_grant_scope"],
+        "properties": {
+          "permitted_grant_scope": {
+            "$ref": "#/$defs/flow_scope"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["permitted_grant_scope"],
+        "properties": {
+          "permitted_grant_scope": {
+            "type": "object"
+          }
+        }
+      },
+      "then": {
+        "required": ["observed_flow"],
+        "properties": {
+          "observed_flow": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "anyOf": [
+          {
+            "not": {
+              "required": ["observed_flow"]
+            }
+          },
+          {
+            "properties": {
+              "observed_flow": {
+                "type": "null"
+              }
+            },
+            "required": ["observed_flow"]
+          }
+        ]
+      },
+      "then": {
+        "properties": {
+          "allowed_responses": {
+            "not": {
+              "contains": {
+                "enum": ["ALLOW_TEMPORARY", "BLOCK_TEMPORARY"]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "context_round": {
+            "const": 1
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "previous_request_id": {
+            "type": "null"
+          }
+        }
+      },
+      "else": {
+        "required": ["previous_request_id"],
+        "properties": {
+          "previous_request_id": {
+            "$ref": "#/$defs/identifier"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}$"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    },
+    "ip_address": {
+      "type": "string",
+      "anyOf": [
+        {
+          "format": "ipv4"
+        },
+        {
+          "format": "ipv6"
+        }
+      ],
+      "not": {
+        "pattern": "[/*%]"
+      }
+    },
+    "port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    },
+    "ttl": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 86400
+    },
+    "decision": {
+      "enum": [
+        "ALLOW_TEMPORARY",
+        "BLOCK_TEMPORARY",
+        "KEEP_CURRENT_POLICY",
+        "DENY",
+        "REQUEST_MORE_INFORMATION"
+      ]
+    },
+    "flow_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "dependentRequired": {
+        "interface_in": ["interface_out"],
+        "interface_out": ["interface_in"]
+      },
+      "required": [
+        "source_ip",
+        "destination_ip",
+        "destination_port",
+        "protocol"
+      ],
+      "properties": {
+        "source_ip": {
+          "$ref": "#/$defs/ip_address"
+        },
+        "destination_ip": {
+          "$ref": "#/$defs/ip_address"
+        },
+        "destination_port": {
+          "$ref": "#/$defs/port"
+        },
+        "protocol": {
+          "enum": ["tcp", "udp"]
+        },
+        "direction": {
+          "const": "forward",
+          "default": "forward"
+        },
+        "interface_in": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/interface_name"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "interface_out": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/interface_name"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "observed_flow": {
+      "type": "object",
+      "additionalProperties": false,
+      "dependentRequired": {
+        "interface_in": ["interface_out"],
+        "interface_out": ["interface_in"]
+      },
+      "required": [
+        "source_ip",
+        "destination_ip",
+        "destination_port",
+        "protocol",
+        "timestamp"
+      ],
+      "properties": {
+        "source_ip": {
+          "$ref": "#/$defs/ip_address"
+        },
+        "destination_ip": {
+          "$ref": "#/$defs/ip_address"
+        },
+        "source_port": {
+          "$ref": "#/$defs/port"
+        },
+        "destination_port": {
+          "$ref": "#/$defs/port"
+        },
+        "protocol": {
+          "enum": ["tcp", "udp"]
+        },
+        "direction": {
+          "const": "forward",
+          "default": "forward"
+        },
+        "interface_in": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/interface_name"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "interface_out": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/interface_name"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "interface_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,63}$"
+    }
+  },
+  "$comment": "The Pydantic contract additionally requires expires_at after created_at and exact equality between permitted_grant_scope and the service fields in observed_flow when present."
+}

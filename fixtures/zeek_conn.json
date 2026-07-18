@@ -1,0 +1,22 @@
+{
+  "schema_version": "zeek-event-v1",
+  "event_id": "zeek-CxDemo001",
+  "log_type": "conn",
+  "sensor_id": "zeek-lab-1",
+  "record": {
+    "ts": 1784394060.125,
+    "uid": "CxDemo001",
+    "id.orig_h": "10.0.2.1",
+    "id.orig_p": 51842,
+    "id.resp_h": "10.0.3.10",
+    "id.resp_p": 443,
+    "proto": "tcp",
+    "service": "ssl",
+    "duration": 0.031,
+    "orig_bytes": 128,
+    "resp_bytes": 0,
+    "conn_state": "S0",
+    "orig_pkts": 1,
+    "resp_pkts": 0
+  }
+}

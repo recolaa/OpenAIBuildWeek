@@ -1,0 +1,52 @@
+{
+  "schema_version": "context-request-v1",
+  "request_id": "ctx-drop-1042-round-2",
+  "event_id": "drop-1042",
+  "incident_id": "inc-drop-1042",
+  "incident_version": 2,
+  "context_round": 2,
+  "previous_request_id": "ctx-drop-1042",
+  "type": "NETWORK_ACCESS_CONTEXT",
+  "severity": "medium",
+  "created_at": "2026-07-18T17:01:02Z",
+  "expires_at": "2026-07-18T17:03:02Z",
+  "observed_flow": {
+    "source_ip": "10.0.2.1",
+    "destination_ip": "10.0.3.10",
+    "source_port": 51842,
+    "destination_port": 443,
+    "protocol": "tcp",
+    "direction": "forward",
+    "interface_in": "eth0",
+    "interface_out": "eth1",
+    "timestamp": "2026-07-18T17:00:00Z"
+  },
+  "permitted_grant_scope": {
+    "source_ip": "10.0.2.1",
+    "destination_ip": "10.0.3.10",
+    "destination_port": 443,
+    "protocol": "tcp",
+    "direction": "forward",
+    "interface_in": "eth0",
+    "interface_out": "eth1"
+  },
+  "matched_policy": {
+    "rule_id": "BLOCK_VPN_SOURCE",
+    "description": "Connections from known commercial VPN ranges are denied",
+    "maximum_ttl_seconds": 600
+  },
+  "agent_analysis": {
+    "summary": "The supplied identity and maintenance-window statements are advisory context and still require an explicit scoped decision.",
+    "missing_context": [
+      "Whether an authorized network manager approves this exact temporary service-flow lease"
+    ],
+    "trust": "UNTRUSTED_ADVISORY"
+  },
+  "question": "Does an authorized network manager approve this exact forward HTTPS flow temporarily?",
+  "allowed_responses": [
+    "ALLOW_TEMPORARY",
+    "KEEP_CURRENT_POLICY",
+    "REQUEST_MORE_INFORMATION"
+  ],
+  "maximum_ttl_seconds": 600
+}

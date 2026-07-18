@@ -1,0 +1,19 @@
+{
+  "schema_version": "drop-event-v1",
+  "event_id": "drop-1042",
+  "timestamp": "2026-07-18T17:00:00Z",
+  "source_ip": "10.0.2.1",
+  "destination_ip": "10.0.3.10",
+  "source_port": 51842,
+  "destination_port": 443,
+  "protocol": "tcp",
+  "direction": "forward",
+  "rule_id": "BLOCK_VPN_SOURCE",
+  "drop_reason": "Source IP categorized as VPN exit node",
+  "interface_in": "eth0",
+  "interface_out": "eth1",
+  "packet_count": 1,
+  "raw_context": {
+    "reporter": "demo-firewall"
+  }
+}

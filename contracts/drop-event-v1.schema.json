@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intentbridge.local/contracts/drop-event-v1.schema.json",
+  "title": "IntentBridge firewall drop event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "timestamp",
+    "source_ip",
+    "destination_ip",
+    "source_port",
+    "destination_port",
+    "protocol",
+    "direction"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "drop-event-v1"
+    },
+    "event_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source_ip": {
+      "$ref": "#/$defs/ip_address"
+    },
+    "destination_ip": {
+      "$ref": "#/$defs/ip_address"
+    },
+    "source_port": {
+      "$ref": "#/$defs/port"
+    },
+    "destination_port": {
+      "$ref": "#/$defs/port"
+    },
+    "protocol": {
+      "enum": ["tcp", "udp"]
+    },
+    "direction": {
+      "enum": ["input", "output", "forward"]
+    },
+    "rule_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}$"
+    },
+    "drop_reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    },
+    "interface_in": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,63}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "interface_out": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,63}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "packet_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647,
+      "default": 1
+    },
+    "raw_context": {
+      "$ref": "#/$defs/raw_context"
+    }
+  },
+  "anyOf": [
+    {
+      "required": ["rule_id"]
+    },
+    {
+      "required": ["drop_reason"]
+    }
+  ],
+  "$defs": {
+    "ip_address": {
+      "type": "string",
+      "anyOf": [
+        {
+          "format": "ipv4"
+        },
+        {
+          "format": "ipv6"
+        }
+      ],
+      "not": {
+        "pattern": "[/*%]"
+      }
+    },
+    "port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    },
+    "raw_context": {
+      "type": "object",
+      "maxProperties": 512,
+      "propertyNames": {
+        "maxLength": 256
+      },
+      "additionalProperties": true,
+      "$comment": "The application additionally enforces 32 KiB, eight levels, 512 total nodes, finite numbers, and 8 KiB strings."
+    }
+  }
+}

@@ -1,0 +1,23 @@
+schema_version: agent-policy-v1
+default_maximum_ttl_seconds: 600
+context_request_timeout_seconds: 120
+allowed_approver_roles:
+  - network-manager
+  - security-operator
+allowed_temporary_actions:
+  FIREWALL_DROP:
+    - ALLOW_TEMPORARY
+    - KEEP_CURRENT_POLICY
+    - REQUEST_MORE_INFORMATION
+  ALERT:
+    - BLOCK_TEMPORARY
+    - KEEP_CURRENT_POLICY
+    - REQUEST_MORE_INFORMATION
+  NOTICE:
+    - BLOCK_TEMPORARY
+    - KEEP_CURRENT_POLICY
+    - REQUEST_MORE_INFORMATION
+  CONNECTION:
+    - BLOCK_TEMPORARY
+    - KEEP_CURRENT_POLICY
+    - REQUEST_MORE_INFORMATION

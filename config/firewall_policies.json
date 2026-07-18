@@ -1,0 +1,26 @@
+{
+  "BLOCK_VPN_SOURCE": {
+    "rule_id": "BLOCK_VPN_SOURCE",
+    "description": "Connections from known commercial VPN ranges are denied",
+    "risk_level": "medium",
+    "allowed_exception": "temporary_exact_service_flow",
+    "maximum_ttl_seconds": 600,
+    "requires_human_context": true
+  },
+  "ZEEK_SUSPICIOUS_CONNECTION": {
+    "rule_id": "ZEEK_SUSPICIOUS_CONNECTION",
+    "description": "Zeek reported a connection that may require temporary containment",
+    "risk_level": "high",
+    "allowed_exception": "temporary_exact_service_block",
+    "maximum_ttl_seconds": 600,
+    "requires_human_context": true
+  },
+  "DEFAULT": {
+    "rule_id": "DEFAULT",
+    "description": "No named local policy was supplied for this observation",
+    "risk_level": "unknown",
+    "allowed_exception": null,
+    "maximum_ttl_seconds": 300,
+    "requires_human_context": true
+  }
+}
